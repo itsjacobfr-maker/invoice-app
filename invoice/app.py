@@ -2,8 +2,11 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-import os, datetime, json
+import os, datetime, json, uuid, base64
 from dotenv import load_dotenv
+
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
 
 load_dotenv()
 
@@ -138,7 +141,8 @@ def invoice_new():
 def invoice_view(id):
     inv = Invoice.query.get_or_404(id)
     if inv.user_id != current_user.id:
-        flash("Not allowed", "danger"); return redirect(url_for('dashboard'))
+        flash("Not allowed", "danger")
+        return redirect(url_for('dashboard'))
     client = Client.query.get(inv.client_id) if inv.client_id else None
     items = json.loads(inv.items_json)
     return render_template('invoice_view.html', inv=inv, client=client, items=items)
@@ -148,11 +152,62 @@ def invoice_view(id):
 def invoice_download(id):
     inv = Invoice.query.get_or_404(id)
     if inv.user_id != current_user.id:
-        flash("Not allowed", "danger"); return redirect(url_for('dashboard'))
-    if not inv.filename:
-        flash("No generated PDF found. Use preview to generate PDF.", "warning")
-        return redirect(url_for('invoice_view', id=id))
+        flash("Not allowed", "danger")
+        return redirect(url_for('dashboard'))
+
     uploads = os.path.join(basedir, 'uploads')
+    os.makedirs(uploads, exist_ok=True)
+
+    if not inv.filename:
+        client = Client.query.get(inv.client_id) if inv.client_id else None
+        filename = f"invoice_{inv.id}_{uuid.uuid4().hex[:8]}.pdf"
+        path = os.path.join(uploads, filename)
+
+        c = canvas.Canvas(path, pagesize=letter)
+        width, height = letter
+
+        # Business info
+        c.setFont("Helvetica-Bold", 16)
+        c.drawString(50, height-50, current_user.business_name or "Your Business Name")
+
+        # Invoice info
+        c.setFont("Helvetica", 12)
+        c.drawString(50, height-80, f"Invoice #: {inv.invoice_number or inv.id}")
+        c.drawString(50, height-100, f"Created: {inv.created_at.strftime('%Y-%m-%d')}")
+        if inv.due_date:
+            c.drawString(50, height-120, f"Due: {inv.due_date.strftime('%Y-%m-%d')}")
+
+        # Client info
+        if client:
+            c.drawString(50, height-150, f"Bill To: {client.name}")
+            if client.email: c.drawString(50, height-170, f"Email: {client.email}")
+            if client.phone: c.drawString(50, height-190, f"Phone: {client.phone}")
+
+        # Items
+        c.drawString(50, height-220, "Items:")
+        y = height-240
+        try:
+            items = json.loads(inv.items_json)
+            for item in items:
+                desc = item.get("description","")
+                qty = item.get("quantity",1)
+                price = item.get("unit_price",0)
+                total_item = item.get("total",0)
+                c.drawString(60, y, f"{desc} | Qty: {qty} | Unit: ${price:.2f} | Total: ${total_item:.2f}")
+                y -= 20
+        except:
+            c.drawString(60, y, "No items found.")
+            y -= 20
+
+        # Total & Paid status
+        c.drawString(50, y-10, f"Total: ${inv.total:.2f}")
+        c.drawString(50, y-30, f"Paid: {'Yes' if inv.paid else 'No'}")
+
+        c.showPage()
+        c.save()
+        inv.filename = filename
+        db.session.commit()
+
     return send_from_directory(uploads, inv.filename, as_attachment=True)
 
 @app.route('/invoice/<int:id>/mark_paid', methods=['POST'])
@@ -175,7 +230,6 @@ def upload_pdf(id):
     if not data:
         return jsonify({'ok':False}), 400
     parts = data.split(',',1)
-    import base64, uuid
     b = base64.b64decode(parts[1])
     uploads = os.path.join(basedir, 'uploads')
     os.makedirs(uploads, exist_ok=True)
@@ -195,7 +249,6 @@ def paypal_webhook():
         etype = event.get('event_type')
         resource = event.get('resource', {})
 
-        # Get subscriber email and invoice ID (custom_id)
         subscriber_email = resource.get('subscriber', {}).get('email_address')
         invoice_id = resource.get('custom_id')
 
@@ -214,7 +267,6 @@ def paypal_webhook():
                     u.paypal_active = True
                     db.session.commit()
 
-            # Mark invoice as paid
             if invoice_id:
                 inv = Invoice.query.get(int(invoice_id))
                 if inv and not inv.paid:
@@ -251,5 +303,5 @@ def initdb():
 # --- Main ---
 if __name__ == '__main__':
     with app.app_context():
-        db.create_all()  # ensures tables exist before running
+        db.create_all()
     app.run(debug=True)
