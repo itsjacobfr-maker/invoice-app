@@ -194,20 +194,38 @@ def paypal_webhook():
     try:
         etype = event.get('event_type')
         resource = event.get('resource', {})
-        subscriber_email = resource.get('subscriber', {}).get('email_address') or resource.get('custom_id') or None
+
+        # Get subscriber email and invoice ID (custom_id)
+        subscriber_email = resource.get('subscriber', {}).get('email_address')
+        invoice_id = resource.get('custom_id')
+
+        # Update user subscription
         if etype in ('BILLING.SUBSCRIPTION.CANCELLED','BILLING.SUBSCRIPTION.SUSPENDED','PAYMENT.SALE.DENIED'):
             if subscriber_email:
                 u = User.query.filter_by(email=subscriber_email.lower()).first()
                 if u:
-                    u.paypal_active = False; db.session.commit()
+                    u.paypal_active = False
+                    db.session.commit()
+
         elif etype in ('PAYMENT.SALE.COMPLETED','BILLING.SUBSCRIPTION.ACTIVATED','BILLING.SUBSCRIPTION.CREATED'):
             if subscriber_email:
                 u = User.query.filter_by(email=subscriber_email.lower()).first()
                 if u:
-                    u.paypal_active = True; db.session.commit()
+                    u.paypal_active = True
+                    db.session.commit()
+
+            # Mark invoice as paid
+            if invoice_id:
+                inv = Invoice.query.get(int(invoice_id))
+                if inv and not inv.paid:
+                    inv.paid = True
+                    db.session.commit()
+                    print(f"Invoice {inv.id} marked as paid via webhook.")
+
     except Exception as e:
         print("Webhook processing error:", e)
-    return jsonify({'ok':True})
+
+    return jsonify({'ok': True})
 
 # ---- Settings page with PayPal button ----
 @app.route('/settings')
