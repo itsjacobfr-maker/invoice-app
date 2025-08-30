@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Invoice #{{ inv.id }}</h2>
+<p>Created: {{ inv.created_at.strftime('%Y-%m-%d') }}</p>
+<p>Due: {{ inv.due_date.strftime('%Y-%m-%d') if inv.due_date else '—' }}</p>
+{% if client %}<p>Client: {{ client.name }} {% if client.email %} ({{ client.email }}){% endif %}</p>{% endif %}
+<table border="1" cellpadding="6" cellspacing="0">
+<tr><th>Description</th><th>Qty</th><th>Price</th><th>Line</th></tr>
+{% for it in items %}
+<tr><td>{{ it.description }}</td><td>{{ it.qty }}</td><td>${{ '%.2f' % it.price }}</td><td>${{ '%.2f' % (it.qty*it.price) }}</td></tr>
+{% endfor %}
+<tr><td colspan="3">Total</td><td>${{ '%.2f' % inv.total }}</td></tr>
+</table>
+<p>Paid: {{ 'Yes' if inv.paid else 'No' }}</p>
+{% if not inv.paid %}
+<button id="markpaid">Mark as paid</button>
+{% endif %}
+<br><br>
+<button id="genpdf">Preview & Generate PDF</button>
+{% if inv.filename %}<p>Saved PDF: <a href="{{ url_for('invoice_download', id=inv.id) }}">Download</a></p>{% endif %}
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+const inv = {{ inv.id }};
+document.getElementById('markpaid')?.addEventListener('click', ()=>{
+  fetch(`/invoice/${inv}/mark_paid`, {method:'POST'}).then(r=>r.json()).then(j=>{ if(j.ok) location.reload(); });
+});
+
+document.getElementById('genpdf').addEventListener('click', async ()=>{
+  const {{ jsPDF }} = window.jspdf;
+  const doc = new jsPDF();
+  let y = 20;
+  doc.setFontSize(16); doc.text('Invoice #{{ inv.id }}', 20, y); y+=10;
+  doc.setFontSize(12); doc.text('Date: {{ inv.created_at.strftime("%Y-%m-%d") }}', 20, y); y+=8;
+  {% if client %}doc.text('Bill to: {{ client.name }}', 20, y); y+=8;{% endif %}
+  y+=4;
+  doc.text('Items:', 20, y); y+=6;
+  {% for it in items %}
+  doc.text('{{ it.description }} - {{ it.qty }} x ${{ '%.2f' % it.price }} = ${{ '%.2f' % (it.qty*it.price) }}', 20, y); y+=6;
+  {% endfor %}
+  y+=6; doc.text('Total: ${{ '%.2f' % inv.total }}', 20, y);
+  // generate base64 PDF
+  const pdfBase64 = doc.output('datauristring');
+  // upload to server
+  const resp = await fetch(`/upload_pdf/{{ inv.id }}`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({pdf_base64:pdfBase64})});
+  const j = await resp.json();
+  if(j.ok){ alert('PDF saved on server'); location.reload(); }
+});
+</script>
+{% endblock %}

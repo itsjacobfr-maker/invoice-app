@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Settings & Billing</h2>
+
+<form method="post" action="{{ url_for('update_settings') }}">
+    <label>Business Name:</label>
+    <input type="text" name="business_name" value="{{ current_user.business_name or '' }}">
+    <button type="submit">Save</button>
+</form>
+
+<p>Subscription status: 
+{% if paypal_active %}
+    <strong style="color:green">Active</strong>
+{% else %}
+    <strong style="color:red">Inactive</strong>
+{% endif %}
+</p>
+
+<p>To subscribe for $10/month, use the PayPal button below. Make sure you've created a PayPal subscription plan and placed its ID in the .env PAYPAL_PLAN_ID.</p>
+
+<div id="paypal-button-container"></div>
+
+<script src="https://www.paypal.com/sdk/js?client-id=AWY-J744U08tt4tzBfXqpuKnPXcLlp5A88rS6KhWXnaAqRT58HWbgpzalF3-9MNwzsZqpRG-ihQfZf4-&vault=true&intent=subscription"></script>
+<script>
+paypal.Buttons({
+    createSubscription: function(data, actions) {
+        return actions.subscription.create({
+            plan_id: 'P-98S62224J35706023NCZJGRA', // Your sandbox plan ID
+            custom_id: '{{ current_user.email }}' // Tracks which user subscribed
+        });
+    },
+    onApprove: function(data, actions) {
+        alert('Subscription created! ID: ' + data.subscriptionID + '\\nNote: PayPal webhooks will automatically update subscription status.');
+    }
+}).render('#paypal-button-container');
+</script>
+
+{% endblock %}

@@ -1,0 +1,8 @@
+body{font-family:Arial,Helvetica,sans-serif;margin:0;padding:0}
+.nav{background:#222;color:#fff;padding:8px}
+.nav a{color:#fff;margin-right:8px;text-decoration:none}
+.container{padding:16px}
+.flashes{list-style:none;padding:0}
+.flash{padding:8px;margin-bottom:6px;border-radius:4px}
+.flash.danger{background:#f8d7da;color:#721c24}
+.flash.warning{background:#fff3cd;color:#856404}

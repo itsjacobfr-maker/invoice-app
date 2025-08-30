@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Invoice App</h1>
+<p>Simple invoice generator — paid plan only. $10/month via PayPal subscription.</p>
+<p><a href="{{ url_for('register') }}">Register</a> or <a href="{{ url_for('login') }}">Login</a></p>
+{% endblock %}

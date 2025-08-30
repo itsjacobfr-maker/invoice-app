@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>New Invoice</h2>
+<form id="invform" method="post">
+  <label>Client:</label>
+  <select name="client_id">
+    <option value="">-- no client --</option>
+    {% for c in clients %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+  </select><br><br>
+  <label>Due date:</label><input type="date" name="due_date"><br><br>
+  <div id="items">
+    <div class="item-row">
+      <input class="desc" placeholder="Description">
+      <input class="qty" placeholder="Qty" value="1" type="number">
+      <input class="price" placeholder="Price" value="0.00" type="number" step="0.01">
+      <button type="button" class="del">X</button>
+    </div>
+  </div>
+  <button id="add" type="button">Add Item</button><br><br>
+  <input type="hidden" name="items_json" id="items_json">
+  <input type="hidden" name="total" id="total" value="0">
+  <button type="submit">Create Invoice</button>
+</form>
+<script>
+function recalc(){
+  let rows = document.querySelectorAll('.item-row');
+  let items=[]; let total=0;
+  rows.forEach(r=>{
+    let desc=r.querySelector('.desc').value||'';
+    let qty=Number(r.querySelector('.qty').value)||0;
+    let price=Number(r.querySelector('.price').value)||0;
+    items.push({description:desc, qty:qty, price:price});
+    total += qty*price;
+  });
+  document.getElementById('items_json').value = JSON.stringify(items);
+  document.getElementById('total').value = total.toFixed(2);
+}
+document.getElementById('add').addEventListener('click', ()=>{
+  let div=document.createElement('div'); div.className='item-row';
+  div.innerHTML=`<input class="desc" placeholder="Description"><input class="qty" placeholder="Qty" value="1" type="number"><input class="price" placeholder="Price" value="0.00" type="number" step="0.01"><button type="button" class="del">X</button>`;
+  document.getElementById('items').appendChild(div);
+  div.querySelector('.del').addEventListener('click', ()=>{div.remove(); recalc();});
+  div.querySelectorAll('input').forEach(i=>i.addEventListener('input', recalc));
+});
+document.querySelectorAll('.del').forEach(b=>b.addEventListener('click', function(){this.parentElement.remove(); recalc();}));
+document.querySelectorAll('.item-row input').forEach(i=>i.addEventListener('input', recalc));
+</script>
+{% endblock %}

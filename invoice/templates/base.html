@@ -1,0 +1,36 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>InvoiceApp</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <!-- PayPal JS SDK (client-side subscription button). Replace 'test' with 'sb' for sandbox or your client-id. -->
+  <script src="https://www.paypal.com/sdk/js?client-id=sb&vault=true&intent=subscription"></script>
+</head>
+<body>
+<nav class="nav">
+  <a href="{{ url_for('dashboard') }}">Dashboard</a> |
+  <a href="{{ url_for('invoice_new') }}">New Invoice</a> |
+  <a href="{{ url_for('clients') }}">Clients</a> |
+  <a href="{{ url_for('settings') }}">Settings</a> |
+  {% if current_user.is_authenticated %}
+    <span style="margin-left:10px;">Logged in: {{ current_user.email }} (<a href="{{ url_for('logout') }}">Logout</a>)</span>
+  {% else %}
+    <a href="{{ url_for('login') }}">Login</a> | <a href="{{ url_for('register') }}">Register</a>
+  {% endif %}
+</nav>
+<div class="container">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <ul class="flashes">
+      {% for cat,msg in messages %}
+        <li class="flash {{ cat }}">{{ msg }}</li>
+      {% endfor %}
+      </ul>
+    {% endif %}
+  {% endwith %}
+  {% block content %}{% endblock %}
+</div>
+</body>
+</html>

@@ -1,0 +1,22 @@
+{% set now = namespace(fn=cycler) %}{% macro now() %}{{ namespace._now or datetime.utcnow() }}{% endmacro %}{% extends "base.html" %}
+{% block content %}
+<h2>Dashboard</h2>
+<p>Total outstanding: ${{ '%.2f' % total_outstanding }}</p>
+<h3>Invoices</h3>
+<table border="1" cellpadding="6" cellspacing="0">
+  <tr><th>No.</th><th>Client</th><th>Total</th><th>Paid</th><th>Due</th><th>Actions</th></tr>
+  {% for inv in invoices %}
+  <tr {% if inv.due_date and not inv.paid and inv.due_date < now() %}style='background:#fdd'{% endif %}>
+    <td>{{ inv.invoice_number or inv.id }}</td>
+    <td>{% if inv.client_id %}{{ inv.client.name }}{% else %}—{% endif %}</td>
+    <td>${{ '%.2f' % inv.total }}</td>
+    <td>{{ 'Yes' if inv.paid else 'No' }}</td>
+    <td>{{ inv.due_date.strftime('%Y-%m-%d') if inv.due_date else '—' }}</td>
+    <td>
+      <a href="{{ url_for('invoice_view', id=inv.id) }}">View</a>
+      {% if inv.filename %} | <a href="{{ url_for('invoice_download', id=inv.id) }}">Download PDF</a>{% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}
